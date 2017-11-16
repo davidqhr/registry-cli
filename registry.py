@@ -6,6 +6,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import json
 import re
 import argparse
+import os
 
 ## this is a registry manipulator, can do following:
 ##   - list all images (including layers)
@@ -246,7 +247,8 @@ for more detail on garbage collection read here:
         '-l','--login',
         help="Login and password to access to docker registry",
         required=False,
-        metavar="USER:PASSWORD")
+        metavar="USER:PASSWORD",
+        default=os.environ.get('CREDENTIALS', None))
 
     parser.add_argument(
         '-r','--host',
