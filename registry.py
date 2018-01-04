@@ -99,11 +99,11 @@ class Registry:
         return r
 
 
-    def send(self, path, method="GET"):
+    def send(self, path, method="GET", headers=None):
         # try:
         result = self.http.request(
             method, "{0}{1}".format(self.hostname, path),
-            headers = self.HEADERS,
+            headers = headers or self.HEADERS,
             auth=(None if self.username == ""
                   else (self.username, self.password)),
             verify = not self.no_validate_ssl)
