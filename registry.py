@@ -411,6 +411,7 @@ def get_tags(all_tags_list, image_name, tags_like):
     return result
 
 def main_loop(args):
+    print('nexus registry cli started...')
 
     keep_last_versions = int(args.num)
 
