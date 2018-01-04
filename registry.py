@@ -162,6 +162,19 @@ class Registry:
 
         return tag_digest
 
+    def get_tag_date(self, image_name, tag):
+        headers = {"Accept":
+                   "application/vnd.docker.distribution.manifest.list.v2+json"}
+        result = self.send("/v2/{0}/manifests/{1}".format(
+            image_name, tag), method="GET", headers=headers)
+
+        if result == None:
+            print("  tag digest not found: {0}".format(self.last_error))
+            return None
+
+        history = json.loads(result.text)["history"][0]["v1Compatibility"]
+        return json.loads(history)["created"]
+
     def delete_tag(self, image_name, tag, dry_run, tag_digests_to_ignore):
         if dry_run:
             print('would delete tag {0}'.format(tag))
