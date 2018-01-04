@@ -99,11 +99,11 @@ class Registry:
         return r
 
 
-    def send(self, path, method="GET"):
+    def send(self, path, method="GET", headers=None):
         # try:
         result = self.http.request(
             method, "{0}{1}".format(self.hostname, path),
-            headers = self.HEADERS,
+            headers = headers or self.HEADERS,
             auth=(None if self.username == ""
                   else (self.username, self.password)),
             verify = not self.no_validate_ssl)
@@ -132,16 +132,22 @@ class Registry:
         if result == None:
             return []
 
+        tags = []
         try:
             tags_list = json.loads(result.text)['tags']
+            for tag in tags_list:
+                date = self.get_tag_date(image_name, tag)
+                tags.append((tag, date))
         except ValueError:
             self.last_error = "list_tags: invalid json response"
             return []
 
-        if tags_list != None:
-            tags_list.sort(key=natural_keys)
+        if tags != None:
+            decorated = [(tup[1], tup) for tup in tags]
+            decorated.sort()
+            tags = [tup for second, tup in decorated]
 
-        return tags_list
+        return tags
 
     # def list_tags_like(self, tag_like, args_tags_like):
     #     for tag_like in args_tags_like:
@@ -161,6 +167,19 @@ class Registry:
         tag_digest = image_headers.headers['Docker-Content-Digest']
 
         return tag_digest
+
+    def get_tag_date(self, image_name, tag):
+        headers = {"Accept":
+                   "application/vnd.docker.distribution.manifest.list.v2+json"}
+        result = self.send("/v2/{0}/manifests/{1}".format(
+            image_name, tag), method="GET", headers=headers)
+
+        if result == None:
+            print("  tag digest not found: {0}".format(self.last_error))
+            return None
+
+        history = json.loads(result.text)["history"][0]["v1Compatibility"]
+        return json.loads(history)["created"]
 
     def delete_tag(self, image_name, tag, dry_run, tag_digests_to_ignore):
         if dry_run:
@@ -339,8 +358,8 @@ def delete_tags(
 
     if tags_to_keep:
         print("Getting digests for tags to keep:")
-        for tag in tags_to_keep:
-
+        for tag_info in tags_to_keep:
+            tag = tag_info[0]
             print("Getting digest for tag {0}".format(tag))
             digest = registry.get_tag_digest(image_name, tag)
             if digest is None:            
@@ -355,7 +374,7 @@ def delete_tags(
         if tag in tags_to_keep:
             continue
 
-        print("  deleting tag {0}".format(tag))
+        print("  deleting tag {0}".format(tag[0]))
 
 ##        deleting layers is disabled because 
 ##        it also deletes shared layers
@@ -364,34 +383,35 @@ def delete_tags(
 ##            layer_digest = layer['digest']
 ##            registry.delete_tag_layer(image_name, layer_digest, dry_run)
 
-        registry.delete_tag(image_name, tag, dry_run, keep_tag_digests)
+        registry.delete_tag(image_name, tag[0], dry_run, keep_tag_digests)
 
 def get_tags_like(args_tags_like, tags_list):
-    result = set()
+    result = list()
     for tag_like in args_tags_like:
         print("tag like: {0}".format(tag_like))
         for tag in tags_list:
-            if re.search(tag_like, tag):
-                print("Adding {0} to tags list".format(tag))
-                result.add(tag)
+            if re.search(tag_like, tag[0]):
+                print("Adding {0} to tags list".format(tag[0]))
+                result.append(tag)
     return result
 
 def get_tags(all_tags_list, image_name, tags_like):
     # check if there are args for special tags
-    result = set()
+    result = list()
     if tags_like:
         result = get_tags_like(tags_like, all_tags_list)
     else:
-        result.update(all_tags_list)
+        result = all_tags_list
 
     # get tags from image name if any
-    if ":" in image_name:
-        (image_name, tag_name) = image_name.split(":")
-        result = set([tag_name])
+    # if ":" in image_name:
+    #     (image_name, tag_name) = image_name.split(":")
+    #     result = set([tag_name])
 
     return result
 
 def main_loop(args):
+    print('nexus registry cli started...')
 
     keep_last_versions = int(args.num)
 
@@ -423,9 +443,9 @@ def main_loop(args):
 
         # print(tags and optionally layers        
         for tag in tags_list:
-            print("  tag: {0}".format(tag))
+            print("  tag: {0} - {1}".format(tag[0], tag[1]))
             if args.layers:
-                for layer in registry.list_tag_layers(image_name, tag):
+                for layer in registry.list_tag_layers(image_name, tag[0]):
                     if 'size' in layer:
                         print("    layer: {0}, size: {1}".format(
                             layer['digest'], layer['size']))
@@ -444,7 +464,7 @@ def main_loop(args):
             if args.delete_all:
                 tags_list_to_delete = list(tags_list)
             else:
-                tags_list_to_delete = sorted(tags_list, key=natural_keys)[:-keep_last_versions]
+                tags_list_to_delete = tags_list[:-keep_last_versions]
 
                 # A manifest might be shared between different tags. Explicitly add those
                 # tags that we want to preserve to the keep_tags list, to prevent
