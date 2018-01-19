@@ -374,7 +374,7 @@ def delete_tags(
         if tag in tags_to_keep:
             continue
 
-        print("  deleting tag {0}".format(tag[0]))
+        print("  deleting tag {0}:{1}".format(image_name, tag[0]))
 
 ##        deleting layers is disabled because 
 ##        it also deletes shared layers
