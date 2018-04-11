@@ -135,9 +135,10 @@ class Registry:
         tags = []
         try:
             tags_list = json.loads(result.text)['tags']
-            for tag in tags_list:
-                date = self.get_tag_date(image_name, tag)
-                tags.append((tag, date))
+            if tags_list:
+                for tag in tags_list:
+                    date = self.get_tag_date(image_name, tag)
+                    tags.append((tag, date))
         except ValueError:
             self.last_error = "list_tags: invalid json response"
             return []
